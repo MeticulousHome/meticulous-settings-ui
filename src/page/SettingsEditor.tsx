@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   BooleanField,
   DragDropList,
@@ -7,12 +7,23 @@ import {
   StringField,
 } from "../components/Settings";
 import { useSettings, useUpdateSettings } from "../hooks/useSettings";
+import { useProfiles } from "../hooks/useProfiles";
 
 export const SettingsEditor = () => {
   const { data: settings, isLoading, error } = useSettings();
+  const { data: profiles } = useProfiles();
   const mutation = useUpdateSettings();
 
   const [localSettings, setLocalSettings] = useState<any>({});
+
+  const getProfileName = useCallback(
+    (profileId: string) => {
+      if (!profiles) return profileId;
+      const profile = profiles.find((p: any) => p.id === profileId);
+      return profile ? profile.name : profileId;
+    },
+    [profiles]
+  );
 
   useEffect(() => {
     if (settings) setLocalSettings(settings);
@@ -42,8 +53,24 @@ export const SettingsEditor = () => {
         }}
       >
         {Object.entries(localSettings).map(([key, value]) => {
-          console.log(key, value);
-          if (
+          if (key === "profile_order" && Array.isArray(value)) {
+            return (
+              <DragDropList
+                key={key}
+                value={value.map((profileId: string) => ({
+                  key: profileId,
+                  value: getProfileName(profileId),
+                }))}
+                onChange={(v) =>
+                  handleChange(
+                    key,
+                    v.map((item: any) => item.key)
+                  )
+                }
+                title={"Profile Order"}
+              />
+            );
+          } else if (
             typeof value === "object" &&
             value !== null &&
             !Array.isArray(value)
@@ -97,7 +124,13 @@ export const SettingsEditor = () => {
           }
         })}
         <button type="submit" className="btn btn-primary mt-3">
-          Save Settings
+          {mutation.isError
+            ? `Failed to save: ${mutation.error}`
+            : mutation.isPending
+            ? "Saving..."
+            : mutation.isSuccess
+            ? "Saved"
+            : "Save Settings"}
         </button>
       </form>
     </main>
